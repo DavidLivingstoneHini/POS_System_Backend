@@ -223,7 +223,12 @@ public class SalesOrderService {
             }
 
             // Handle Payments
-            processPayments(obj.get("paymentList"), salesOrder);
+            JsonNode paymentList = obj.get("paymentList"); // Extract the paymentList as JsonNode
+            if (paymentList != null) {
+                processPayments(paymentList, salesOrder); // Pass the JsonNode to processPayments
+            } else {
+                throw new Exception("Payment list is missing");
+            }
 
             // Handle Order Details
             processOrderDetails(obj.get("products"), salesOrder);
@@ -305,25 +310,33 @@ public class SalesOrderService {
     private void processPayments(JsonNode paymentList, SalesOrder salesOrder) throws Exception {
         for (JsonNode onePayment : paymentList) {
             int paymentId = onePayment.get("paymentId").asInt();
-            String user = onePayment.get("user").asText();
+            String username = onePayment.get("user").asText();
             String paymentDate = onePayment.get("paymentDate").asText();
             Date date = new SimpleDateFormat("dd-MM-yyyy").parse(paymentDate);
-            Double amount = onePayment.get("amount").asDouble();
+            Double amountReceived = onePayment.get("amount").asDouble();
+            Double totalBill = onePayment.get("totalBill").asDouble();
+            Double totalPayment = onePayment.get("totalPayment").asDouble();
+            Double balance = onePayment.get("balance").asDouble();
+            String salesOrderId = onePayment.get("salesOrderId").asText(); // Get the sales order ID
+
+            // Retrieve the SalesOrder using the salesOrderId
+            salesOrder = salesOrderRepository.findById(Long.valueOf(salesOrderId))
+                    .orElseThrow(() -> new Exception("SalesOrder not found for ID: " + salesOrderId));
 
             if (paymentId == 0) {
                 SalesOrderPayment payment = new SalesOrderPayment();
-                payment.setAmountReceived(amount);
-                payment.setTotalPayment(amount);
-                payment.setBalance(0.0);
-                payment.setPaymentDate(date);
-                payment.setUsername(user);
-                payment.setSalesOrder(salesOrder);
-                payment.setTotalBill(salesOrder.getGrandTotal());
-
+                payment.setAmountReceived(amountReceived);
+                payment.setTotalBill(totalBill);
+                payment.setTotalPayment(totalPayment);
+                payment.setBalance(balance);
+                payment.setPaymentDate(new Date());
+                payment.setUsername(username);
+                payment.setSalesOrder(salesOrder); // Associate with the retrieved SalesOrder
                 salesOrderPaymentRepository.save(payment);
             }
         }
     }
+
 
     private void processOrderDetails(JsonNode details, SalesOrder salesOrder) throws Exception {
         for (JsonNode oneDetail : details) {
@@ -906,4 +919,3 @@ public class SalesOrderService {
         public void setPosOrders(List<PosOrder> posOrders) { this.posOrders = posOrders; }
     }
 }
-
